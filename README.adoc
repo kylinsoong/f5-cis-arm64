@@ -1,0 +1,23 @@
+= F5 CIS on ARM64
+
+This repository contains git diffs for building F5 CIS on ARM64.
+
+The reference version contains:
+
+[cols="2,5a,5a"]
+|===
+|VERSION |GIT DIFF |IMAGE
+
+|2.0-stable-C3456795
+|
+* link:2.0-stable-C3456795/git.status[git.status]
+* link:2.0-stable-C3456795/git.diff[git.diff]
+|
+----
+docker pull cloudadc/k8s-bigip-ctlr:2.0-C3456795-aarch64
+----
+
+|TODO
+|TODO
+|TODO
+|===
