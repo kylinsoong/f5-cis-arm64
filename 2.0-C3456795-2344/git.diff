@@ -1,0 +1,227 @@
+diff --git a/build-tools/Dockerfile.debian.builder b/build-tools/Dockerfile.debian.builder
+index 97a612f8..df7d11be 100755
+--- a/build-tools/Dockerfile.debian.builder
++++ b/build-tools/Dockerfile.debian.builder
+@@ -1,4 +1,4 @@
+-FROM python:3.6-slim-buster
++FROM arm64v8/python:3.6-slim-buster
+ 
+ # gcc for cgo
+ RUN apt-get update && apt-get install -y --no-install-recommends \
+@@ -12,13 +12,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
+ 		git \
+ 		rsync \
+ 		procps \
++		libffi-dev \
+ 	&& rm -rf /var/lib/apt/lists/*
+ 
+ ENV GOLANG_VERSION 1.12
+ 
+ # licensee dependencies
+ RUN apt-get update && apt-get install -y ruby bundler cmake pkg-config git libssl-dev libpng-dev
+-RUN gem install licensee
++#RUN gem install licensee
+ 
+ RUN set -eux; \
+ 	\
+@@ -65,16 +66,18 @@ COPY requirements.docs.txt /tmp/requirements.docs.txt
+ RUN pip install --no-cache-dir --upgrade pip==20.0.2 && \
+     pip install --no-cache-dir setuptools flake8 virtualenv && \
+ 	pip install --no-cache-dir -r /tmp/requirements.txt && \
+-	pip install --no-cache-dir -r /tmp/requirements.docs.txt && \
++	#pip install --no-cache-dir -r /tmp/requirements.docs.txt && \
++	export GO111MODULE=on && \
+ 	go get github.com/wadey/gocovmerge && \
+ 	go get golang.org/x/tools/cmd/cover && \
+ 	go get github.com/mattn/goveralls && \
+ 	go get github.com/onsi/ginkgo/ginkgo && \
+-	go get github.com/onsi/gomega && \
++	go get github.com/onsi/gomega@v1.10.4 && \
+ 	chmod 755 /entrypoint.sh
+ 
+ COPY --from=gosu/assets /opt/gosu /opt/gosu
+ RUN set -x \
++    && sed -i 's/gosu-${arch}/gosu-arm64/g' /opt/gosu/gosu.install.sh \
+     && /opt/gosu/gosu.install.sh \
+     && rm -fr /opt/gosu
+ 
+diff --git a/build-tools/Dockerfile.debian.runtime b/build-tools/Dockerfile.debian.runtime
+index c60fb1f4..52246884 100755
+--- a/build-tools/Dockerfile.debian.runtime
++++ b/build-tools/Dockerfile.debian.runtime
+@@ -1,4 +1,4 @@
+-FROM python:3.6-slim-buster
++FROM arm64v8/python:3.6-slim-buster
+ 
+ ENV APPPATH /app
+ 
+@@ -12,6 +12,11 @@ COPY requirements.txt /tmp/requirements.txt
+ 
+ RUN apt-get update && apt-get install -y --no-install-recommends \
+         git \
++        g++ \
++        gcc \
++        libc6-dev \
++        libffi-dev \
++        libssl-dev \
+     && apt-get upgrade -y \
+     && pip install --no-cache-dir --upgrade pip==20.0.2 \
+     && pip install --no-cache-dir -r /tmp/requirements.txt \
+diff --git a/build-tools/_build-lib.sh b/build-tools/_build-lib.sh
+index 42d72715..d2aac60d 100755
+--- a/build-tools/_build-lib.sh
++++ b/build-tools/_build-lib.sh
+@@ -51,7 +51,8 @@ get_builddir() {
+ }
+ 
+ # This is the expected output location, from the release build container
+-RELEASE_PLATFORM=linux-amd64-release-go1.12
++#RELEASE_PLATFORM=linux-amd64-release-go1.12
++RELEASE_PLATFORM=linux-arm64-release-go1.12
+ 
+ NO_CACHE_ARGS=""
+ if $CLEAN_BUILD; then
+diff --git a/build-tools/build-devel-image.sh b/build-tools/build-devel-image.sh
+index 2f3ecd19..a70f6440 100755
+--- a/build-tools/build-devel-image.sh
++++ b/build-tools/build-devel-image.sh
+@@ -1,5 +1,9 @@
+ #!/bin/bash
+ 
++echo ""
++echo "    Start build-devel-image.sh"
++echo ""
++
+ set -e
+ set -x
+ 
+diff --git a/build-tools/build-release-artifacts.sh b/build-tools/build-release-artifacts.sh
+index e09d03be..31891727 100755
+--- a/build-tools/build-release-artifacts.sh
++++ b/build-tools/build-release-artifacts.sh
+@@ -2,6 +2,10 @@
+ 
+ # This script builds and uses a docker container to produce official artifacts
+ 
++echo ""
++echo "    Start build-release-artifacts.sh"
++echo ""
++
+ set -e
+ set -x
+ 
+diff --git a/build-tools/build-release-images.sh b/build-tools/build-release-images.sh
+index 81b56ce5..e8069b08 100755
+--- a/build-tools/build-release-images.sh
++++ b/build-tools/build-release-images.sh
+@@ -3,6 +3,9 @@
+ # This script packages up artifacts produced by ./build-release-artifacts.sh
+ # into an official container.
+ 
++echo ""
++echo "    Start build-release-images.sh"
++echo ""
+ 
+ set -e
+ set -x
+@@ -30,7 +33,7 @@ docker run -v workspace_vol:/build -d --name cp-temp alpine tail -f /dev/null
+ # copying CIS binary to local
+ docker cp cp-temp:/build/out/$RELEASE_PLATFORM/bin/k8s-bigip-ctlr $WKDIR/
+ # copy attributions to local
+-docker cp cp-temp:/build/all_attributions.txt $CURDIR/../../k8s-bigip-ctlr
++#docker cp cp-temp:/build/all_attributions.txt $CURDIR/../../k8s-bigip-ctlr
+ #Removing the temporory container
+ docker rm -f cp-temp
+ 
+diff --git a/build-tools/rel-build.sh b/build-tools/rel-build.sh
+index 067cea10..28b6edae 100755
+--- a/build-tools/rel-build.sh
++++ b/build-tools/rel-build.sh
+@@ -13,9 +13,9 @@ export BUILDDIR=$BUILDDIR
+ 
+ # Licensee need this path to generate attributions
+ vendor_dir="$CURDIR/../../k8s-bigip-ctlr/vendor"
+-. $CURDIR/attributions-generator.sh
++#. $CURDIR/attributions-generator.sh
+ # Run the attributions and save the content to a local file.
+-generate_attributions_licensee $vendor_dir >> /build/all_attributions.txt
++#generate_attributions_licensee $vendor_dir >> /build/all_attributions.txt
+ 
+ DEBUG=$DEBUG go_install $(all_cmds)
+ 
+diff --git a/pkg/appmanager/appManager.go b/pkg/appmanager/appManager.go
+index fa03281b..986c4eb3 100644
+--- a/pkg/appmanager/appManager.go
++++ b/pkg/appmanager/appManager.go
+@@ -2403,6 +2403,23 @@ func containsNode(nodes []Node, name string) bool {
+ 	return false
+ }
+ 
++type byTimestamp []v1.Service
++
++//sort services by timestamp
++func (slice byTimestamp) Len() int {
++	return len(slice)
++}
++
++func (slice byTimestamp) Less(i, j int) bool {
++	d1 := slice[i].GetCreationTimestamp()
++	d2 := slice[j].GetCreationTimestamp()
++	return d1.Before(&d2)
++}
++
++func (slice byTimestamp) Swap(i, j int) {
++	slice[i], slice[j] = slice[j], slice[i]
++}
++
+ // Performs Service discovery for the given AS3 Pool and returns a pool.
+ // Service discovery is loosely coupled with Kubernetes Service labels. A Kubernetes Service is treated as a match for
+ // an AS3 Pool, if the Kubernetes Service have the following labels and their values matches corresponding AS3
+@@ -2430,14 +2447,17 @@ func (m *Manager) getEndpoints(selector string) []Member {
+ 	}
+ 
+ 	if len(services.Items) > 1 {
+-		svcNames := ""
+ 
++                svcName := ""
++                sort.Sort(byTimestamp(services.Items))
++                //picking up the oldest service
++                services.Items = services.Items[:1]
++          
+ 		for _, service := range services.Items {
+-			svcNames += fmt.Sprintf("Service: %v, Namespace: %v \n", service.Name, service.Namespace)
++                        svcName += fmt.Sprintf("Service: %v, Namespace: %v,Timestamp: %v\n", service.Name, service.Namespace, service.GetCreationTimestamp())
+ 		}
+ 
+-		log.Errorf("[CORE] Multiple Services are tagged for this pool. Ignoring all endpoints.\n%v", svcNames)
+-		return members
++                log.Warningf("[CORE] Multiple Services are tagged for this pool. Using oldest service endpoints.\n%v", svcName)
+ 	}
+ 
+ 	for _, service := range services.Items {
+diff --git a/pkg/vxlan/vxlanMgr.go b/pkg/vxlan/vxlanMgr.go
+index f48b95b1..0c565e9e 100644
+--- a/pkg/vxlan/vxlanMgr.go
++++ b/pkg/vxlan/vxlanMgr.go
+@@ -284,13 +284,13 @@ func getVtepMac(
+ }
+ 
+ func parseVtepMac(mac, nodeName string) (string, error) {
+-	split := strings.Split(mac, "\"")
+-	if len(split) < 5 {
+-		err := fmt.Errorf("flannel.alpha.coreos.com/backend-data annotation for "+
+-			"node '%s' has invalid format; cannot validate VtepMac. "+
+-			"Should be of the form: '{\"VtepMAC\":\"<mac>\"}'", nodeName)
+-		return "", err
+-	} else {
+-		return split[3], nil
++	var macDict map[string]interface{}
++	json.Unmarshal([]byte(mac), &macDict)
++	if macAddr, ok := macDict["VtepMAC"]; ok {
++		return macAddr.(string), nil
+ 	}
++	err := fmt.Errorf("flannel.alpha.coreos.com/backend-data annotation for "+
++		"node '%s' has invalid format; cannot validate VtepMac. "+
++		"Should be of the form: '{\"VtepMAC\":\"<mac>\"}'", nodeName)
++	return "", err
+ }

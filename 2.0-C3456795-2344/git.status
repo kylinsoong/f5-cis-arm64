@@ -1,0 +1,17 @@
+On branch 2.0-stable
+Your branch is up to date with 'origin/2.0-stable'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   build-tools/Dockerfile.debian.builder
+	modified:   build-tools/Dockerfile.debian.runtime
+	modified:   build-tools/_build-lib.sh
+	modified:   build-tools/build-devel-image.sh
+	modified:   build-tools/build-release-artifacts.sh
+	modified:   build-tools/build-release-images.sh
+	modified:   build-tools/rel-build.sh
+	modified:   pkg/appmanager/appManager.go
+	modified:   pkg/vxlan/vxlanMgr.go
+
+no changes added to commit (use "git add" and/or "git commit -a")
